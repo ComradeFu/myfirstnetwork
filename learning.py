@@ -4,8 +4,9 @@ import copy
 import math
 
 BATCH_SIZE = 30
+TRAIN_SIZE = 10000
 LEARNING_RATE = 0.003
-NETWORK_SHAPE = [2, 100, 20, 15, 2]
+NETWORK_SHAPE = [2, 100, 200, 50, 2]
 
 def create_weights(n_inputs, n_neurons):
     return np.random.randn(n_inputs, n_neurons)
@@ -163,11 +164,12 @@ class Network:
         inputs = data[:, (0, 1)]
         tags = copy.deepcopy(data[:, 2]) # python always reference
         outputs = self.forward(inputs)
-        precise_loss = precise_loss_function(outputs[-1], tags) # 结果更准 
+        precise_loss = self.perprecise_loss = precise_loss_function(outputs[-1], tags) # 结果更准 
         loss = loss_function(outputs[-1], tags) # 意义更准
 
-        if(np.mean(precise_loss < 0.05)):
-            print("No need to train.")
+        if(np.mean(precise_loss) < 0.1):
+            # print("No need to train.")
+            pass
         else:
             # 只是一个优化，其实不一定必须
             new_network = self.backward(outputs, tags)
@@ -176,30 +178,48 @@ class Network:
             new_precise_loss = precise_loss_function(new_outputs[-1], tags)
             new_loss = loss_function(new_outputs[-1], tags)
 
-            print(np.mean(precise_loss), np.mean(new_precise_loss), np.mean(loss), np.mean(new_loss))
             if(np.mean(precise_loss) > np.mean(new_precise_loss) or np.mean(loss) > np.mean(new_loss)):
                 for i in range(len(self.layers)):
                     self.layers[i].weights = new_network.layers[i].weights.copy()
                     self.layers[i].biases = new_network.layers[i].biases.copy()
-                print('Improved!')
+                #print('Improved!')
             else:
-                print('Unimproved!')
+                #print('Unimproved!')
+                pass
     
     def train(self, data):
         batch_times = math.ceil(len(data) / BATCH_SIZE)
         for i in range(batch_times):
             batch_data = data[(i * BATCH_SIZE, min(len(data) - 1, (i + 1) * BATCH_SIZE - 1)), : ]
             self.batch_train(batch_data)
-    
-data = gen.creat_data(10001)
-network = Network(NETWORK_SHAPE)
-network.train(data)
 
-data_test = gen.creat_data(100)
-input_test = data_test[:, (0, 1)]
-gen.plot_data(data_test, "tag data")
+def test(network, data):
+    input_test = data[:, (0, 1)]
+    tags = data[:, 2]
+    outputs = network.forward(input_test)
 
-outputs = network.forward(input_test)
-classification = classify(outputs[-1])
-data_test[:, 2] = classification
-gen.plot_data(data_test, "train data")
+    precise_loss = precise_loss_function(outputs[-1], tags)
+    return np.mean(precise_loss)
+
+if __name__ == "__main__":
+
+    data_test = gen.creat_data(100)
+    input_test = data_test[:, (0, 1)]
+    gen.plot_data(data_test, "tag data")
+
+    network = Network(NETWORK_SHAPE)
+    i = 0
+    while(True):
+        i += 1
+        data = gen.creat_data(TRAIN_SIZE)
+        network.train(data)
+            
+        loss = test(network, data_test)
+        print(f"Iteration {i}, Samples {TRAIN_SIZE * i}, Loss: {loss}")
+
+        if(loss < 0.1): break
+
+    outputs = network.forward(input_test)
+    classification = classify(outputs[-1])
+    data_test[:, 2] = classification
+    gen.plot_data(data_test, "train data")
